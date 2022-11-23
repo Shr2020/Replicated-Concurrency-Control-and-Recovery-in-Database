@@ -7,7 +7,29 @@ class DataManager:
         self.site_id = id
         self.buffer = {}
         self.backups = {}
-
+        self.variables = set()
+        self.initialize_site_vars(id)
+        
+    '''
+    Data
+    The data consists of 20 distinct variables x1, ..., x20 (the numbers between 1 and 20 will be referred to as indexes below). There are 10 sites
+    numbered 1 to 10. A copy is indicated by a dot. Thus, x6.2 is the copy of
+    variable x6 at site 2. The odd indexed variables are at one site each (i.e. 1 
+    + (index number mod 10) ). For example, x3 and x13 are both at site 4.
+    Even indexed variables are at all sites. Each variable xi is initialized to the
+    value 10i (10 times i). Each site has an independent lock table. If that site
+    fails, the lock table is erased.
+    '''
+    def initialize_site_vars(self, id):
+        listt = []
+        for i in range (1, 21):
+            if (i % 2 == 0):
+                listt.append("x" + str(i))
+            else:
+                if (id == 1 + (i % 10)):
+                    listt.append("x" + str(i))
+        self.variables = set(listt)
+        
     def release_lock(self, var):
         pass
 
