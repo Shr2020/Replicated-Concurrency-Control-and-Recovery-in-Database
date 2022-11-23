@@ -45,9 +45,13 @@ class TransactionManager:
     def abort_transaction(self, transaction_id):
         pass
 
-    def fail_site(site):
-        site_obj = sites[site]
+    def fail_site(self, site):
+        site_obj = self.sites[site]
         site_obj.fail_site(site)
+
+    def recover_site(self, site):
+        site_obj = self.sites[site]
+        site_obj.recover_site(site)
 
     def deadlock_detect(self):
         pass
