@@ -5,10 +5,11 @@ class DataManager:
         self.is_available = True
         self.lock_map = {}
         self.site_id = id
-        self.buffer = {}
-        self.backups = {}
+        self.buffer = {} #t_id:(var, val)
+        self.backups = {} # t_id:(version_number,db)
         self.variables = set()
         self.initialize_site_vars(id)
+        self.disable_read = False
         
     '''
     Data
@@ -29,6 +30,9 @@ class DataManager:
                 if (id == 1 + (i % 10)):
                     listt.append("x" + str(i))
         self.variables = set(listt)
+
+    def is_var_in_site(self, var):
+        return var in self.variables;
         
     def release_lock(self, var):
         pass
