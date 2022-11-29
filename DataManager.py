@@ -3,7 +3,7 @@ class DataManager:
     def __init__(self, id):
         self.db = DB()
         self.is_available = True
-        self.lock_map = {}
+        self.lock_map = {} 
         self.site_id = id
         self.buffer = {} #t_id:(var, val)
         self.backups = {} # t_id:(version_number,db)
@@ -34,13 +34,53 @@ class DataManager:
         self.variables = set(listt)
 
     def is_var_in_site(self, var):
-        return var in self.variables;
+        return var in self.variables
+    # check if res list has same transaction
+    def can_acquire_write_lock(transaction_id, var):
+        if var not in self.lock_map.keys():
+            return []
         
-    def release_lock(self, var):
-        pass
+        return self.lock_map[var]
 
-    def acquire_lock(self, var):
-        pass
+    def acquire_write_lock(tid, var):
+        lock = Lock("W",tid,var)
+        if var not in self.lock_map.keys():
+            self.lock_map[var] = []
+        for currlock in self.lock_map[var]:
+            if lock.t_id == currLock.t_id and lock.lock_type==currLock.lock_type:
+                return   
+        self.lock_map[var].append(lock)
+
+    def can_acquire_read_lock(tid, var):
+        blocking_transactions = []
+        if var not in self.lock_map.keys():
+            return blocking_transactions
+        for lock in self.lock_map[var]:
+            if lock.t_id != tid and lock_type == "W":
+                blocking_transactions.append(lock)
+        return  blocking_transactions  
+
+    def acquire_read_lock(tid, var):
+        lock = Lock("R",tid,var)
+        if var not in self.lock_map.keys():
+            self.lock_map[var] = []
+            
+        for currlock in self.lock_map[var]:
+            if currlock.t_id == tid:
+                return
+        self.lock_map[var].append(lock)
+   
+    def release_lock(self, var,lock_type):
+        new_locks = []
+        for lock in self.lock_map[var]:
+            if lock.t_id != tid or lock_type != lock.lock_type:
+                new_locks.append(lock)
+        
+        if len(new_locks)>0:
+            self.lock_map[var] = new_locks
+        else:
+            self.lock_map.pop(var)
+
 
     def upgrade_lock(self, var):
         pass
