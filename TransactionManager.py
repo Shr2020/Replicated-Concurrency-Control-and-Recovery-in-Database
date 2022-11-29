@@ -68,6 +68,7 @@ class TransactionManager:
         pass
 
     def read_only_operation(self, transaction_id, variable):
+        #site_obj.read_only_operation
         pass
 
     def dump(self):
