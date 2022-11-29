@@ -40,39 +40,86 @@ class TransactionManager:
         self.current_transactions[transaction_id] = transaction
         self.all_transactions[transaction_id] = transaction
 
-    def write_operation(self, transaction_id, variable, value):
-        # if all sites down:
-            # abort
-        #for all sites:
-            # site_obj.can_acquire_write_lock(t_id, variable)  : (True, None) if it can, (False, t_id) if not
-                #False, t1
-                #false, t2
-                #waitqueu: t1:t3, t2:t3
-        #for all sites:
-            # site_obj.acquire_write_lock(t_id, variable)
-            # site_obj.write_operation
-            # remove operaration form transaction 
-        pass
-    
-    
-    def read_operation(self, transaction_id, variable):
-        # if all sites down:
-            # abort
-        #for any sites:
-            # site_obj.can_acquire_read_lock(t_id, variable)  : True if itcan, False if not
-            #if yes:
-                # site_obj.acquire_read_lock(t_id, variable)
-                # site_obj.read_operation
-        #if false for all:
-            #then waitqueueu
-        pass
+    def write_operation(self, transaction_id, op):
+        var = op.var
+        val = op.val
+        site_to_be_affected = []
+        
+        for site in self.sites.values():
+            if var in site.variables and site.is_site_up:
+                    site_to_be_affected.append(site)
+        
+        if len(site_to_be_affected) == 0:
+            self.abort_transaction()
+        else:
+            blocking_transactions = []
+            for site in site_to_be_affected:
+                can_acquire, blocking_t = site.can_acquire_write_lock(transaction_id, var)
+                if not can_acquire:
+                    blocking_transactions.append(blocking_t)
 
-    def read_only_operation(self, transaction_id, variable):
-        #site_obj.read_only_operation
-        pass
+            if len(blocking_transactions) > 0:
+                for t_id in blocking_transactions:
+                    self.transaction_wait_queue[t_id].append(transaction_id) 
+            else:
+                for site in site_to_be_affected:
+                    site.acquire_write_lock(transaction_id, var)
+                    site.write_operation(transaction_id, var, val)
+                self.all_transactions[transaction_id].remaining_operations.remove(op)
+                self.all_transactions[transaction_id].update_transaction_state(trst.TransactionStates.RUNNING)
+    
+    
+    def read_operation(self, transaction_id, op):
+        var = op.var
+        site_to_read_from = []
+        
+        for site in self.sites.values():
+            if var in site.variables and site.is_site_up and not site.disable_read:
+                    site_to_read_from.append(site)
+        
+        if len(site_to_read_from) == 0:
+            self.abort_transaction()
+        else:
+            blocking_transactions = []
+            for site in site_to_read_from:
+                can_acquire, blocking_t = site.can_acquire_read_lock(transaction_id, var)
+                if not can_acquire:
+                    blocking_transactions.append(blocking_t)
+                else:
+                    site.acquire_write_lock(transaction_id, var)
+                    site.read_operation(transaction_id, var)
+                    self.all_transactions[transaction_id].remaining_operations.remove(op)
+                    self.all_transactions[transaction_id].update_transaction_state(trst.TransactionStates.RUNNING)
+                    break
+            
+            if len(blocking_transactions) == len(site_to_read_from):
+                for t_id in blocking_transactions:
+                    self.transaction_wait_queue[t_id].append(transaction_id) 
+
+    def read_only_operation(self, transaction_id, op):
+        var = op.var
+        site_to_read_from = []
+        
+        for site in self.sites.values():
+            if var in site.variables and site.is_site_up and not site.disable_read:
+                    site_to_read_from.append(site)
+        
+        if len(site_to_read_from) == 0:
+            self.abort_transaction()
+        else:
+            for site in site_to_read_from:
+                site.read_only_operation(transaction_id, var)
+                self.all_transactions[transaction_id].remaining_operations.remove(op)
+                self.all_transactions[transaction_id].update_transaction_state(trst.TransactionStates.RUNNING)
+                break
 
     def dump(self):
-        pass
+        print("Printing values of variables at all Sites.\n")
+        for site in range(1, 11):
+            print("SITE: ", site)
+            site_obj = self.sites[site]
+            site_obj.print_db()
+            print()
 
     def end_transaction(self, transaction_id):
         pass
@@ -86,10 +133,11 @@ class TransactionManager:
                 if op.type == 'W':
                     for site, site_obj in self.sites.items():
                         if site_obj.is_available() and site_obj.is_var_in_site(op.var):
-                            #todo: site buffer update.. remove t_id from the buffer and version from map
-                            pass
+                            #site buffer update.. remove t_id from the buffer and version from map
+                            site_obj.buffer.pop(transaction_id)
+                            site_obj.backups.pop(transaction_id)
         self.aborted_transaction.append(transaction_id)
-        # todo: change transaction state to aborted
+        self.all_transactions[transaction_id].update_transaction_state(trst.TransactionStates.ABORTED)
         self.remove_transaction_from_waiting_queue(transaction_id)
         self.resume_all_waiting_transactions(transaction_id)
         
@@ -151,14 +199,16 @@ class TransactionManager:
             t_id = op[1]
             var = op[2]
             val = op[3]
-            self.all_transactions[t_id].add_operations(opn.Operations('W', self.time, var, val))
-            self.write_operation(t_id, var, val)
+            operation = opn.Operations('W', self.time, var, val)
+            self.all_transactions[t_id].add_operations(operation)
+            self.write_operation(t_id, operation)
 
         elif op == "R":
             t_id = op[1]
             var = op[2]
-            self.all_transactions[t_id].add_operations(opn.Operations('R', self.time, var))
-            self.read_operation(t_id, var)
+            operation = opn.Operations('W', self.time, var, val)
+            self.all_transactions[t_id].add_operations(operation)
+            self.read_operation(t_id, operation)
         
         elif op == "dump":
             self.dump()

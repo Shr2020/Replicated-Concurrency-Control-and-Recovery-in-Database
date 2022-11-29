@@ -8,7 +8,7 @@ class DataManager:
         self.buffer = {} #t_id:(var, val)
         self.backups = {} # t_id:(version_number,db)
         self.variables = set()
-        self.initialize_site_vars(id)
+        self.initialize_site_vars_and_db(id)
         self.disable_read = False
         
     '''
@@ -21,14 +21,16 @@ class DataManager:
     value 10i (10 times i). Each site has an independent lock table. If that site
     fails, the lock table is erased.
     '''
-    def initialize_site_vars(self, id):
+    def initialize_site_vars_and_db(self, id):
         listt = []
         for i in range (1, 21):
             if (i % 2 == 0):
                 listt.append("x" + str(i))
+                self.db.update_key(i, 10*i)
             else:
                 if (id == 1 + (i % 10)):
                     listt.append("x" + str(i))
+                    self.db.update_key(i, 10*i)
         self.variables = set(listt)
 
     def is_var_in_site(self, var):
@@ -54,3 +56,6 @@ class DataManager:
 
     def is_site_up(self):
         return self.is_available
+
+    def print_db(self):
+        self.db.print_kv()
