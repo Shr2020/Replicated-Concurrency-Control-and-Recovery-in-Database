@@ -52,7 +52,7 @@ class TransactionManager:
 
         # find the sites that we can write to
         for site in self.sites.values():
-            if var in site.variables and site.is_site_up:
+            if site.is_site_up and var in site.variables:
                     site_to_be_affected.append(site)
         
         # no available sites

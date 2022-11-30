@@ -16,6 +16,8 @@ class DB:
 
     def has_key(self, key):
         return key in self.kv
+    def remove_key(self,key):
+        self.kv.pop(key,None)
 
     def increment_version(self):
         self.version+=1

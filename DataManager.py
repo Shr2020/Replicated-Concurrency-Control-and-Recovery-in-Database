@@ -124,13 +124,16 @@ class DataManager:
 
 
     def fail_site(self):
+        self.lock_map = {}
+        for i in range (1, 21):
+            if (i % 2 == 0):
+                self.db.remove_key(i)
         self.is_available = False
 
-
     def can_read_var(self, transaction_id, var):
-        if var in self.disable_read:
-            return False
-        return True
+        if self.db.has_key(var):
+            return True
+        return False
 
     def remove_disable_flag_for_var(self, transaction_id, var):
         if var in self.disable_read:
