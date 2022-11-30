@@ -47,10 +47,10 @@ class DataManager:
             return self.buffer[tid][var]
         return self.db.get_value(var)
     
-    def read_only_operation(self,tid,var):
+    def read_only_operation(self, tid, var):
         return self.backups[tid][var]
 
-    def snapshot_db(self,tid):
+    def snapshot_db(self, tid):
         self.backups[tid] = {};
         for var in self.variables:
             self.backups[tid][var] = self.db.get_value(var)
@@ -66,8 +66,8 @@ class DataManager:
                 blocking_transactions.append(lock.t_id)
         return blocking_transactions
 
-    def acquire_write_lock(self,tid, var):
-        lock = Lock("W",tid,var)
+    def acquire_write_lock(self, tid, var):
+        lock = Lock("W", tid, var)
         if var not in self.lock_map.keys():
             self.lock_map[var] = []
         for currlock in self.lock_map[var]:
@@ -75,7 +75,7 @@ class DataManager:
                 return   
         self.lock_map[var].append(lock)
 
-    def can_acquire_read_lock(self,tid, var):
+    def can_acquire_read_lock(self, tid, var):
         blocking_transactions = []
         if var not in self.lock_map.keys():
             return blocking_transactions
@@ -84,8 +84,8 @@ class DataManager:
                 blocking_transactions.append(lock)
         return  blocking_transactions  
 
-    def acquire_read_lock(self,tid, var):
-        lock = Lock("R",tid,var)
+    def acquire_read_lock(self, tid, var):
+        lock = Lock("R", tid, var)
         if var not in self.lock_map.keys():
             self.lock_map[var] = []
         for currlock in self.lock_map[var]:
@@ -93,7 +93,7 @@ class DataManager:
                 return
         self.lock_map[var].append(lock)
    
-    def release_lock(self, var,lock_type,tid):
+    def release_lock(self, var, lock_type, tid):
         new_locks = []
         for lock in self.lock_map[var]:
             if lock.t_id != tid or lock_type != lock.lock_type:
@@ -108,8 +108,8 @@ class DataManager:
         pass
 
     def update_database(self, tid, var):
-        for (var,val) in self.buffer[tid]:
-            self.db.update_key(var,val)
+        for (var, val) in self.buffer[tid]:
+            self.db.update_key(var, val)
 
     def recover_site(self):
         self.is_available = True

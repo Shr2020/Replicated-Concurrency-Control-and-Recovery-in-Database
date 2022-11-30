@@ -1,6 +1,9 @@
 class DB:
     def __init__(self):
+        # version of the DB.
         self.version = 1
+
+        # key-value store 
         self.kv = {}
     
     def update_key(self, key, val):
