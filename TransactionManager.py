@@ -48,6 +48,8 @@ class TransactionManager:
         for site in self.sites.values():
             if var in site.variables and site.is_site_up:
                     site_to_be_affected.append(site)
+            elif var in site.variables and not site.is_site_up:
+                site.add_to_disable_read(var)
         
         if len(site_to_be_affected) == 0:
             # todo: put in waitqeue
@@ -62,11 +64,17 @@ class TransactionManager:
                 for t_id in blocking_transactions:
                     self.transaction_wait_queue[t_id].append(transaction_id) 
             else:
+                t_obj = self.current_transactions[transaction_id]
+                if var not in t_obj.var_affected:
+                    t_obj.var_affected.append(var)
+                
                 for site in site_to_be_affected:
                     site.acquire_write_lock(transaction_id, var)
                     site.write_operation(transaction_id, var, val)
-                self.all_transactions[transaction_id].remaining_operations.remove(op)
-                self.all_transactions[transaction_id].update_transaction_state(trst.TransactionStates.RUNNING)
+                    if site not in t_obj.site_affected:
+                        t_obj.site_affected.append(site)
+                t_obj.remaining_operations.remove(op)
+                t_obj.update_transaction_state(trst.TransactionStates.RUNNING)
     
     
     def read_operation(self, transaction_id, op):
@@ -82,18 +90,25 @@ class TransactionManager:
             pass
         else:
             blocking_transactions = []
+            read_invoked = False
             for site in site_to_read_from:
                 blocking_t = site.can_acquire_read_lock(transaction_id, var)
-                if len(blocking_t) > 0:
-                    blocking_transactions.append(blocking_t)
+                if blocking_t:
+                    blocking_transactions.extend(blocking_t)
                 else:
-                    site.acquire_write_lock(transaction_id, var)
+                    t_obj = self.current_transactions[transaction_id]
+                    if var not in t_obj.var_affected:
+                        t_obj.var_affected.append(var)
+                    site.acquire_read_lock(transaction_id, var)
                     site.read_operation(transaction_id, var)
-                    self.all_transactions[transaction_id].remaining_operations.remove(op)
-                    self.all_transactions[transaction_id].update_transaction_state(trst.TransactionStates.RUNNING)
+                    if site not in t_obj.site_affected:
+                        t_obj.site_affected.append(site)
+                    t_obj.remaining_operations.remove(op)
+                    t_obj.update_transaction_state(trst.TransactionStates.RUNNING)
+                    read_invoked = True
                     break
             
-            if len(blocking_transactions) == len(site_to_read_from):
+            if not read_invoked:
                 for t_id in blocking_transactions:
                     self.transaction_wait_queue[t_id].append(transaction_id) 
 
@@ -102,7 +117,7 @@ class TransactionManager:
         site_to_read_from = []
         
         for site in self.sites.values():
-            if var in site.variables and site.is_site_up and not site.disable_read:
+            if var in site.variables and site.is_site_up and site.can_read_var(transaction_id, var):
                     site_to_read_from.append(site)
         
         if len(site_to_read_from) == 0:

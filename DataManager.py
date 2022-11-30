@@ -142,3 +142,6 @@ class DataManager:
                 if lock.t_id == t_id:
                     return lock
         return None
+
+    def add_to_disable_read(self, var):
+        self.disable_read.add(var)
