@@ -268,11 +268,35 @@ class TransactionManager:
         site_obj.recover_site(site)
 
     ''' Method to detect a deadlock in wait graph'''
-    def deadlock_detect(self):
+    def deadlock_detect(self,tid,visited,rec_stack):
+        if tid in self.transaction_wait_queue:
+
+            visited[tid] = len(rec_stack) + 1
+            rec_stack.append(tid)
+
+            for curr_tid in self.transaction_wait_queue[tid]:
+
+                if curr_tid in visited:
+                    self.deadlock_clear(rec_stack, visited[curr_tid] - 1)
+                else:
+                    self.detect_deadlock(curr_tid, visited,rec_stack)
+
+            rec_stack.pop()
+            visited.pop(tid)
+
         pass
     
     ''' Method to clear a deadlock in wait graph'''
-    def deadlock_clear(self):
+    def deadlock_clear(self,trans_list,index):
+        transaction_id_list = trans_list[index:]
+        youngest_id = -1
+
+        for t_id in transaction_id_list:
+
+            if youngest_id < t_id:
+                youngest_id = t_id
+
+        self.abort_transaction(t_id)
         pass
     
     ''' Method to create snapshots on sites when a Read ONly Transaction begins.'''
