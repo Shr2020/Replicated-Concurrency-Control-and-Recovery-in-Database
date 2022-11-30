@@ -70,10 +70,16 @@ class DataManager:
         lock = Lock("W", tid, var)
         if var not in self.lock_map.keys():
             self.lock_map[var] = []
+        hasReadLock = False
         for currlock in self.lock_map[var]:
             if lock.t_id == currlock.t_id and lock.lock_type==currlock.lock_type:
-                return   
-        self.lock_map[var].append(lock)
+                return 
+            if lock.t_id == currlock.t_id:
+                hasReadLock = True
+        if hasReadLock:
+            self.upgrade_lock(tid,var)
+        else:
+            self.lock_map[var].append(lock)
 
     def can_acquire_read_lock(self, tid, var):
         blocking_transactions = []
@@ -89,7 +95,7 @@ class DataManager:
         if var not in self.lock_map.keys():
             self.lock_map[var] = []
         for currlock in self.lock_map[var]:
-            if currlock.t_id == tid and lock.lock_type==currlock.lock_type:
+            if currlock.t_id == tid:
                 return
         self.lock_map[var].append(lock)
    
@@ -104,8 +110,10 @@ class DataManager:
         else:
             self.lock_map.pop(var)
 
-    def upgrade_lock(self, var):
-        pass
+    def upgrade_lock(self,tid,var):
+        for lock in self.lock_map[var]:
+            if tid == lock.t_id and lock.lock_type=='R':
+                lock.lock_type='W'
 
     def update_database(self, tid, var):
         for (var, val) in self.buffer[tid]:
@@ -114,8 +122,10 @@ class DataManager:
     def recover_site(self):
         self.is_available = True
 
+
     def fail_site(self):
         self.is_available = False
+
 
     def can_read_var(self, transaction_id, var):
         if var in self.disable_read:
