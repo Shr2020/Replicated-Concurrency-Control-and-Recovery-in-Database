@@ -21,6 +21,7 @@ class TransactionManager:
 
         # list of ended transactions
         self.end_transacion_list = []
+
         self.initialize_sites(self)
         self.initialize_vars(self)
 
@@ -53,11 +54,8 @@ class TransactionManager:
         for site in self.sites.values():
             if var in site.variables and site.is_site_up:
                     site_to_be_affected.append(site)
-            # TODO: is this right???
-            elif var in site.variables and not site.is_site_up:
-                site.add_to_disable_read(var)
         
-        # no avvailable sites
+        # no available sites
         if len(site_to_be_affected) == 0:
             # TODO: put in waitqeue
             pass
@@ -187,6 +185,7 @@ class TransactionManager:
                     self.abort_transaction(transaction_id)
 
                 # resume the trannsactions waiing on it.
+                self.remove_transaction_from_waiting_queue(transaction_id)
                 self.resume_all_waiting_transactions(transaction_id)
             self.current_transactions.pop(transaction_id, None)
             self.transaction_wait_queue.pop(transaction_id, None)
@@ -224,7 +223,7 @@ class TransactionManager:
                 # undo all Writes. Reads can be ignored
                 if op.type == 'W':
                     for site, site_obj in self.sites.items():
-                        if site_obj.is_available() and site_obj.is_var_in_site(op.var):
+                        if site_obj.is_site_up() and site_obj.is_var_in_site(op.var):
                             #site buffer update.. remove t_id from the buffer and version from map
                             site_obj.buffer.pop(transaction_id)
                             site_obj.backups.pop(transaction_id)
