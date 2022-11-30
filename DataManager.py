@@ -60,7 +60,7 @@ class DataManager:
                 blocking_transactions.append(lock)
         return  blocking_transactions  
 
-    def acquire_read_lock(tid, var):
+    def acquire_read_lock(self, tid, var):
         lock = Lock("R",tid,var)
         if var not in self.lock_map.keys():
             self.lock_map[var] = []
@@ -70,7 +70,7 @@ class DataManager:
                 return
         self.lock_map[var].append(lock)
    
-    def release_lock(self, var,lock_type):
+    def release_lock(self, var, lock_type):
         new_locks = []
         for lock in self.lock_map[var]:
             if lock.t_id != tid or lock_type != lock.lock_type:
@@ -80,7 +80,6 @@ class DataManager:
             self.lock_map[var] = new_locks
         else:
             self.lock_map.pop(var)
-
 
     def upgrade_lock(self, var):
         pass
@@ -99,3 +98,14 @@ class DataManager:
 
     def print_db(self):
         self.db.print_kv()
+
+    def get_locks(self):
+        return self.lock_map
+
+    def get_lock_for_this_transaction_and_var(self, t_id, var):
+        if var in self.lock_map:
+            lock_list = self.lock_map[var]
+            for lock in lock_list:
+                if lock.t_id == t_id:
+                    return lock
+        return None

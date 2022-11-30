@@ -6,6 +6,7 @@ class Transaction:
         self.transaction_state = ts.TransactionStates.START
         self.time = time
         self.sites_affected = []
+        self.var_affected = []
         self.operations = []
         # pop operations as we process
         self.remaining_operations = []
@@ -23,3 +24,6 @@ class Transaction:
 
     def update_transaction_state(self, state):
         self.transaction_state = state
+
+    def get_type(self):
+        return self.type

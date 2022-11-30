@@ -50,13 +50,12 @@ class TransactionManager:
                     site_to_be_affected.append(site)
         
         if len(site_to_be_affected) == 0:
-            self.abort_transaction()
+            self.abort_transaction(transaction_id)
         else:
             blocking_transactions = []
             for site in site_to_be_affected:
-                can_acquire, blocking_t = site.can_acquire_write_lock(transaction_id, var)
-                if not can_acquire:
-                    blocking_transactions.append(blocking_t)
+                blocking_t = site.can_acquire_write_lock(transaction_id, var)
+                blocking_transactions.extend(blocking_t)
 
             if len(blocking_transactions) > 0:
                 for t_id in blocking_transactions:
@@ -78,12 +77,12 @@ class TransactionManager:
                     site_to_read_from.append(site)
         
         if len(site_to_read_from) == 0:
-            self.abort_transaction()
+            self.abort_transaction(transaction_id)
         else:
             blocking_transactions = []
             for site in site_to_read_from:
-                can_acquire, blocking_t = site.can_acquire_read_lock(transaction_id, var)
-                if not can_acquire:
+                blocking_t = site.can_acquire_read_lock(transaction_id, var)
+                if len(blocking_t) > 0:
                     blocking_transactions.append(blocking_t)
                 else:
                     site.acquire_write_lock(transaction_id, var)
@@ -105,7 +104,7 @@ class TransactionManager:
                     site_to_read_from.append(site)
         
         if len(site_to_read_from) == 0:
-            self.abort_transaction()
+            self.abort_transaction(transaction_id)
         else:
             for site in site_to_read_from:
                 site.read_only_operation(transaction_id, var)
@@ -122,7 +121,42 @@ class TransactionManager:
             print()
 
     def end_transaction(self, transaction_id):
-        pass
+        if  transaction_id in self.current_transactions:
+            t_obj = self.current_transactions[transaction_id]
+            if t_obj.get_type() == 'RO':
+                print("END READONLY Transaction: ", transaction_id)
+            if t_obj.get_type() == 'RW':
+                if self.all_affected_sites_up(t_obj):
+                    print("END READ-WRITE Transaction: ", transaction_id)
+                    # read writefinal values to all site db.
+                    # release locks held by transaction_id
+                    self.commit_transaction_and_release_locks(t_obj)
+                else:
+                    self.abort_transaction(transaction_id)
+                self.resume_all_waiting_transactions(transaction_id)
+            self.current_transactions.pop(transaction_id, None)
+            self.transaction_wait_queue.pop(transaction_id, None)
+    
+    def all_affected_sites_up(self, transaction):
+        for site_id in transaction.sites_affected:
+            site = self.sites[site_id]
+            if not site.is_site_up():
+                return False
+        return True
+                
+    def commit_transaction_and_release_locks(self, transaction):
+        for var in transaction.vars_affected:
+            for site_id in transaction.sites_affected:
+                site = self.sites[site_id]
+                lock = site.get_lock_for_this_transaction_and_var(transaction.id, var)
+                if lock:
+                    # lock is write lock. write to db and release lock
+                    if lock.type == 'W':
+                        site.update_database(transaction.id, var)
+                        site.release_lock(transaction.id, var, 'W')
+                    # lock is read lock. release lock
+                    if lock.type == 'R':
+                        site.release_lock(transaction.id, var, 'R')
 
     def abort_transaction(self, transaction_id):
         if transaction_id in self.current_transactions:
@@ -137,6 +171,7 @@ class TransactionManager:
                             site_obj.buffer.pop(transaction_id)
                             site_obj.backups.pop(transaction_id)
         self.aborted_transaction.append(transaction_id)
+        self.current_transactions.pop(transaction_id, None)
         self.all_transactions[transaction_id].update_transaction_state(trst.TransactionStates.ABORTED)
         self.remove_transaction_from_waiting_queue(transaction_id)
         self.resume_all_waiting_transactions(transaction_id)
