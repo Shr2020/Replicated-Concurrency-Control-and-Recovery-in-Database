@@ -26,12 +26,14 @@ class DataManager:
         listt = []
         for i in range (1, 21):
             if (i % 2 == 0):
-                listt.append("x" + str(i))
-                self.db.update_key(i, 10*i)
+                var = "x" + str(i)
+                listt.append(var)
+                self.db.update_key(var, 10*i)
             else:
                 if (id == 1 + (i % 10)):
-                    listt.append("x" + str(i))
-                    self.db.update_key(i, 10*i)
+                    var = "x" + str(i)
+                    listt.append(var)
+                    self.db.update_key(var, 10*i)
         self.variables = set(listt)
 
     def is_var_in_site(self, var):
@@ -126,8 +128,9 @@ class DataManager:
     def fail_site(self):
         self.lock_map = {}
         for i in range (1, 21):
-            if (i % 2 == 0):
-                self.db.remove_key(i)
+            if (i % 2 == 0): 
+                var = "x" + str(i)
+                self.db.remove_key(var)
         self.is_available = False
 
     def can_read_var(self, transaction_id, var):
