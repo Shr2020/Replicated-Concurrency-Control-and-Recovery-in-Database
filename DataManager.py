@@ -36,12 +36,16 @@ class DataManager:
 
     def is_var_in_site(self, var):
         return var in self.variables
+
     # check if res list has same transaction
-    def can_acquire_write_lock(self,transaction_id, var):
+    def can_acquire_write_lock(self,tid, var):
+        blocking_transactions = []
         if var not in self.lock_map.keys():
-            return []
-        
-        return self.lock_map[var]
+            return blocking_transactions
+        for lock in self.lock_map[var]:
+            if lock.t_id != tid:
+                blocking_transactions.append(lock.t_id)
+        return blocking_transactions
 
     def acquire_write_lock(self,tid, var):
         lock = Lock("W",tid,var)
@@ -65,9 +69,8 @@ class DataManager:
         lock = Lock("R",tid,var)
         if var not in self.lock_map.keys():
             self.lock_map[var] = []
-            
         for currlock in self.lock_map[var]:
-            if currlock.t_id == tid:
+            if currlock.t_id == tid and lock.lock_type==currlock.lock_type:
                 return
         self.lock_map[var].append(lock)
    
@@ -86,8 +89,10 @@ class DataManager:
     def upgrade_lock(self, var):
         pass
 
-    def update_database(self, t_id, var):
-        pass
+    def update_database(self, tid, var):
+        for (var,val) in self.buffer[tid]:
+            self.db.update_key(var,val)
+        
 
     def recover_site(self):
         self.is_available = True
