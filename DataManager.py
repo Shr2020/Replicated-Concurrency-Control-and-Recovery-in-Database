@@ -10,7 +10,7 @@ class DataManager:
         self.backups = {} # t_id:(version_number,db)
         self.variables = set()
         self.initialize_site_vars_and_db(id)
-        self.disable_read = False
+        self.disable_read = set()
         
     '''
     Data
@@ -110,13 +110,21 @@ class DataManager:
     def update_database(self, tid, var):
         for (var,val) in self.buffer[tid]:
             self.db.update_key(var,val)
-        
 
     def recover_site(self):
         self.is_available = True
 
     def fail_site(self):
-        self.is_available = True
+        self.is_available = False
+
+    def can_read_var(self, transaction_id, var):
+        if var in self.disable_read:
+            return False
+        return True
+
+    def remove_disable_flag_for_var(self, transaction_id, var):
+        if var in self.disable_read:
+            self.disable_read.remove(var)
 
     def is_site_up(self):
         return self.is_available

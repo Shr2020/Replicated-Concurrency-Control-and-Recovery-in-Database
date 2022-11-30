@@ -50,7 +50,8 @@ class TransactionManager:
                     site_to_be_affected.append(site)
         
         if len(site_to_be_affected) == 0:
-            self.abort_transaction(transaction_id)
+            # todo: put in waitqeue
+            pass
         else:
             blocking_transactions = []
             for site in site_to_be_affected:
@@ -73,11 +74,12 @@ class TransactionManager:
         site_to_read_from = []
         
         for site in self.sites.values():
-            if var in site.variables and site.is_site_up and not site.disable_read:
+            if var in site.variables and site.is_site_up and site.can_read_var(transaction_id, var):
                     site_to_read_from.append(site)
         
         if len(site_to_read_from) == 0:
-            self.abort_transaction(transaction_id)
+            # todo: put in waitqeue
+            pass
         else:
             blocking_transactions = []
             for site in site_to_read_from:
