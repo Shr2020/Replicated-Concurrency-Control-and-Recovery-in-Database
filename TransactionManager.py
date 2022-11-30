@@ -39,7 +39,7 @@ class TransactionManager:
     def begin_transaction(self, transaction_id, transaction):
         self.current_transactions[transaction_id] = transaction
         self.all_transactions[transaction_id] = transaction
-
+        
     def write_operation(self, transaction_id, op):
         var = op.var
         val = op.val
@@ -229,6 +229,10 @@ class TransactionManager:
     def deadlock_clear(self):
         pass
 
+    def create_snapshots(self, t_id):
+        for site_obj in self.sites.values():
+            site_obj.snapshot_db(t_id)
+    
     def execute_transaction(self, transaction):
         self.tick()
         op = transaction[0]
@@ -242,6 +246,7 @@ class TransactionManager:
             t_id = op[1]
             t_obj = tr.Transaction(t_id, self.time, "RO")
             self.begin_transaction(t_id, t_obj)
+            self.create_snapshots(t_id)
 
         elif op == "end":
             t_id = op[1]
@@ -258,9 +263,13 @@ class TransactionManager:
         elif op == "R":
             t_id = op[1]
             var = op[2]
-            operation = opn.Operations('W', self.time, var, val)
-            self.all_transactions[t_id].add_operations(operation)
-            self.read_operation(t_id, operation)
+            operation = opn.Operations('R', self.time, var, val)
+            t_obj = self.all_transactions[t_id]
+            t_obj.add_operations(operation)
+            if t_obj.type == 'RO':
+                self.read_only_operation(t_id, operation)
+            else:
+                self.read_operation(t_id, operation)
         
         elif op == "dump":
             self.dump()
