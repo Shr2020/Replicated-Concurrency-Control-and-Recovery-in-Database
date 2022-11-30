@@ -37,6 +37,25 @@ class DataManager:
     def is_var_in_site(self, var):
         return var in self.variables
 
+    def write_operation(self,tid, var, val):
+        if tid not in self.buffer.keys():
+            self.buffer[tid] = {}
+        self.buffer[tid][var] = val
+
+    def read_operation(self,tid,var):
+        if tid in self.buffer.keys() and var in self.buffer[tid]:
+            return self.buffer[tid][var]
+        return self.db.get_value(var)
+    
+    def read_only_operation(self,tid,var):
+        return self.backups[tid][var]
+
+    def snapshot_db(self,tid):
+        self.backups[tid] = {};
+        for var in self.variables:
+            self.backups[tid][var] = self.db.get_value(var)
+
+
     # check if res list has same transaction
     def can_acquire_write_lock(self,tid, var):
         blocking_transactions = []
