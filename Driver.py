@@ -1,6 +1,6 @@
 import argparse
 import sys
-#import TransactionManager as t
+import TransactionManager as t
 import re
 fname = ""
 
@@ -10,7 +10,7 @@ args = parser.parse_args()
 
 fname = args.filename
 
-#tm = t.TransactionManager()
+tm = t.TransactionManager()
 
 def start(file):
     f = open(file, 'r')
@@ -18,6 +18,7 @@ def start(file):
         x = x.replace(")", "").strip()
         s = re.split('\(|\)|,', x)
         print(s)
+        tm.execute_transaction(s)
     f.close()
 
 try:
