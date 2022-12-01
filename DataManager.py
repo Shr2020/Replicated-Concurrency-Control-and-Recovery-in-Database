@@ -1,8 +1,8 @@
-import DB
-import Lock
+import DB as db
+import Lock as lk
 class DataManager:
     def __init__(self, id):
-        self.db = DB()
+        self.db = db.DB()
         self.is_available = True
         self.lock_map = {} 
         self.site_id = id
@@ -69,7 +69,7 @@ class DataManager:
         return blocking_transactions
 
     def acquire_write_lock(self, tid, var):
-        lock = Lock("W", tid, var)
+        lock = lk.Lock("W", var,tid)
         if var not in self.lock_map.keys():
             self.lock_map[var] = []
         hasReadLock = False
@@ -93,7 +93,7 @@ class DataManager:
         return  blocking_transactions  
 
     def acquire_read_lock(self, tid, var):
-        lock = Lock("R", tid, var)
+        lock = lk.Lock("R", tid, var)
         if var not in self.lock_map.keys():
             self.lock_map[var] = []
         for currlock in self.lock_map[var]:
@@ -101,7 +101,7 @@ class DataManager:
                 return
         self.lock_map[var].append(lock)
    
-    def release_lock(self, var, lock_type, tid):
+    def release_lock(self,tid, var, lock_type):
         new_locks = []
         for lock in self.lock_map[var]:
             if lock.t_id != tid or lock_type != lock.lock_type:

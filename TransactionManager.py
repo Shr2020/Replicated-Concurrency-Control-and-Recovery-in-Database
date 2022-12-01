@@ -54,7 +54,7 @@ class TransactionManager:
     
     ''' Method to handle write operation for a read write transaction.'''
     def write_operation(self, transaction_id, op):
-        if self.current_transactions[t_id].transaction_state != trst.TransactionStates.TO_BE_ABORTED:
+        if self.current_transactions[transaction_id].transaction_state != trst.TransactionStates.TO_BE_ABORTED:
             var = op.var
             val = op.val
             site_to_be_affected = []
@@ -62,7 +62,7 @@ class TransactionManager:
             # find the sites that we can read from
             for site in self.sites.values():
                 if var in site.variables:
-                    sites_var.append(site.id)
+                    sites_var.append(site.site_id)
                 if site.is_site_up and var in site.variables:
                         site_to_be_affected.append(site)
             
@@ -105,8 +105,8 @@ class TransactionManager:
                         site.acquire_write_lock(transaction_id, var)
                         site.write_operation(transaction_id, var, val)
                         # add affected site to this transaction. Needed to release lock during commit
-                        if site not in t_obj.site_affected:
-                            t_obj.site_affected.add(site)
+                        if site.site_id not in t_obj.sites_affected:
+                            t_obj.sites_affected.add(site.site_id)
                     t_obj.remaining_operations.remove(op)
                     t_obj.update_transaction_state(trst.TransactionStates.RUNNING)
     
@@ -205,7 +205,8 @@ class TransactionManager:
 
     '''Method to handle the end transaction'''
     def end_transaction(self, transaction_id):
-        if (t_obj.transaction_status == trst.TransactionStates.TO_BE_ABORTED):
+        t_obj = self.all_transactions[transaction_id]
+        if (t_obj.transaction_state == trst.TransactionStates.TO_BE_ABORTED):
                 self.abort_transaction(transaction_id)
                 # resume the trannsactions waiing on it.
                 self.remove_transaction_from_waiting_queue(transaction_id)
@@ -245,18 +246,18 @@ class TransactionManager:
     
     ''' Method to commit all changes and release locks held by this transactions on all sites.'''
     def commit_transaction_and_release_locks(self, transaction):
-        for var in transaction.vars_affected:
+        for var in transaction.var_affected:
             for site_id in transaction.sites_affected:
                 site = self.sites[site_id]
-                lock = site.get_lock_for_this_transaction_and_var(transaction.id, var)
+                lock = site.get_lock_for_this_transaction_and_var(transaction.transaction_id, var)
                 if lock:
                     # lock is write lock. write to db and release lock
-                    if lock.type == 'W':
-                        site.update_database(transaction.id, var)
-                        site.release_lock(transaction.id, var, 'W')
+                    if lock.lock_type == 'W':
+                        site.update_database(transaction.transaction_id, var)
+                        site.release_lock(transaction.transaction_id, var, 'W')
                     # lock is read lock. release lock
-                    if lock.type == 'R':
-                        site.release_lock(transaction.id, var, 'R')
+                    if lock.lock_type == 'R':
+                        site.release_lock(transaction.transaction_id, var, 'R')
         transaction.update_transaction_state(trst.TransactionStates.COMMITED)
 
     ''' Method to handlle aborting a transaction.'''
@@ -295,7 +296,7 @@ class TransactionManager:
     def remove_transaction_from_waiting_queue(self, transaction_id):
         # remove this transaction from waiting queue of all transactions
         for var in self.transaction_wait_queue:
-            for t_list in self.transaction_wait_queue[var].values:
+            for t_list in self.transaction_wait_queue[var]:
                 if transaction_id in set(t_list):
                     t_list.remove(transaction_id)
 
@@ -320,7 +321,8 @@ class TransactionManager:
         # transactions waiting on transaction:transaction_id
         transactions_list = set()
         for var in self.transaction_wait_queue:
-            transactions_list.add(self.transaction_wait_queue[var][transaction_id])
+            if transaction_id in self.transaction_wait_queue[var]:
+                transactions_list.add(self.transaction_wait_queue[var][transaction_id])
         op_list = []
         self.cleanup_waiting_queue(transaction_id) # x:{t1:[t2, t3]} y:{t1:[t4, t5]}
 
@@ -389,38 +391,37 @@ class TransactionManager:
     ''' Method to execute instructions coming from a input file'''
     def execute_transaction(self, transaction):
         self.tick()
-        self.check
         op = transaction[0]
 
         if op == "begin":
-            t_id = op[1]
+            t_id = transaction[1]
             t_obj = tr.Transaction(t_id, self.time, "RW")
             self.begin_transaction(t_id, t_obj)
 
         elif op == "beginRO":
-            t_id = op[1]
+            t_id = transaction[1]
             t_obj = tr.Transaction(t_id, self.time, "RO")
             self.begin_transaction(t_id, t_obj)
             self.create_snapshots(t_id)
 
         elif op == "end":
-            t_id = op[1]
+            t_id = transaction[1]
             self.end_transaction(t_id)
 
         elif op == "W":
-            t_id = op[1]
-            var = op[2]
-            val = op[3]
+            t_id = transaction[1]
+            var = transaction[2]
+            val = transaction[3]
             operation = opn.Operations('W', self.time, t_id, var, val)
-            self.all_transactions[t_id].add_operations(operation)
+            self.all_transactions[t_id].add_operation(operation)
             self.write_operation(t_id, operation)
 
         elif op == "R":
-            t_id = op[1]
-            var = op[2]
-            operation = opn.Operations('R', self.time, t_id, var, val)
+            t_id = transaction[1]
+            var = transaction[2]
+            operation = opn.Operations('R', self.time, t_id, var, None)
             t_obj = self.all_transactions[t_id]
-            t_obj.add_operations(operation)
+            t_obj.add_operation(operation)
             if t_obj.type == 'RO':
                 self.read_only_operation(t_id, operation)
             else:
@@ -430,11 +431,11 @@ class TransactionManager:
             self.dump()
 
         elif op == "fail":
-            site = op[1]
+            site = transaction[1]
             self.fail_site(site)
 
         elif op == "recover":
-            site = op[1]
+            site = transaction[1]
             self.recover_site(site)
             
 
