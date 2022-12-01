@@ -7,3 +7,4 @@ class TransactionStates(Enum):
     COMMITED = 3                  # transaction completed
     WAITING  = 4                  # waiting transaction for a lock
     START = 5                     # transaction started
+    TO_BE_ABORTED = 6

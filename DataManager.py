@@ -46,11 +46,11 @@ class DataManager:
 
     def read_operation(self,tid,var):
         if tid in self.buffer.keys() and var in self.buffer[tid]:
-            return self.buffer[tid][var]
-        return self.db.get_value(var)
+            print(self.buffer[tid][var])
+        print(self.db.get_value(var))
     
     def read_only_operation(self, tid, var):
-        return self.backups[tid][var]
+        print(self.backups[tid][var])
 
     def snapshot_db(self, tid):
         self.backups[tid] = {};

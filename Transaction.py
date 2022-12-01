@@ -12,26 +12,29 @@ class Transaction:
         self.time = time
         
         # all the sites affected
-        self.sites_affected = []
+        self.sites_affected = set()
         
         # all the variables affected (read/write)
         self.var_affected = []
         
-        # list of all operations
+        # queue of all operations
         self.operations = []
         
-        # list of operation yet to be processed. 
+        # queueu of operation yet to be processed. 
         self.remaining_operations = []
 
         # type of transaction. RO: ReadOnly, RW: Read-Write
         self.type = type
 
+        # to abortt ater
+        self.abort_later = False
+
     def add_site(self, site):
         self.sites_affected.append(site)
 
-    def add_operation(self, op, var, val=None):
-        self.operations.append((op, var, val))
-        self.remaining_operations.append((op, var, val))
+    def add_operation(self, op):
+        self.operations.append(op)
+        self.remaining_operations.append(op)
 
     def get_operations(self):
         return self.operations
@@ -41,3 +44,12 @@ class Transaction:
 
     def get_type(self):
         return self.type
+
+    # return the next operation and pops it from the queue
+    def get_op(self):
+        return self.remaining_operations.pop(0)
+
+    # return the next operation by peeking in the queue
+    def read_next_op(self):
+        return self.remaining_operations[0]
+
