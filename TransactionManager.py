@@ -12,7 +12,10 @@ class TransactionManager:
 
         # map of transaction to list of all transactions waiting on it. {var:{t:[list of t' waiting on t]}}
         self.transaction_wait_queue ={}
+        
+        # map of transactions to sites which could start because all sites are down
         self.transaction_waiting_for_site ={}
+
         # list of all aborted transactions
         self.aborted_transaction  = []
 
@@ -22,8 +25,9 @@ class TransactionManager:
         # list of ended transactions
         self.end_transacion_list = []
 
-        self.initialize_sites(self)
-        self.initialize_vars(self)
+        self.initialize_sites()
+        self.initialize_vars()
+        self.initialize_wait_queue()
 
     ''' Method to initialize all sites in our system'''
     def initialize_sites(self):
@@ -34,6 +38,10 @@ class TransactionManager:
     def initialize_vars(self):
         for i in range(1, 21):
             self.vars.append("x"+str(i))
+
+    def initialize_wait_queue(self):
+        for var in self.vars:
+            self.transaction_wait_queue[var] = {}
 
     ''' Method to maintain time.'''
     def tick(self):
@@ -197,7 +205,12 @@ class TransactionManager:
 
     '''Method to handle the end transaction'''
     def end_transaction(self, transaction_id):
-        if  transaction_id in self.current_transactions:
+        if (t_obj.transaction_status == trst.TransactionStates.TO_BE_ABORTED):
+                self.abort_transaction(transaction_id)
+                # resume the trannsactions waiing on it.
+                self.remove_transaction_from_waiting_queue(transaction_id)
+                self.resume_all_waiting_transactions(transaction_id)
+        elif  transaction_id in self.current_transactions:
             t_obj = self.current_transactions[transaction_id]
             # Readonly transactions. Commit it.
             if t_obj.get_type() == 'RO':
@@ -220,8 +233,7 @@ class TransactionManager:
                 # resume the trannsactions waiing on it.
                 self.remove_transaction_from_waiting_queue(transaction_id)
                 self.resume_all_waiting_transactions(transaction_id)
-            self.current_transactions.pop(transaction_id, None)
-            self.cleanup_waiting_queue(transaction_id)
+        self.current_transactions.pop(transaction_id, None)
     
     ''' Method to check if al affected sites by a transaction are available.'''
     def all_affected_sites_up(self, transaction):
@@ -265,8 +277,9 @@ class TransactionManager:
         self.all_transactions[transaction_id].update_transaction_state(trst.TransactionStates.ABORTED)
         # release all locks for this transaction
         for var in t_obj.vars_affected:
-                for site_id in t_obj.sites_affected:
-                    site = self.sites[site_id]
+            for site_id in t_obj.sites_affected:
+                site = self.sites[site_id]
+                if site.is_var_in_site(var):
                     lock = site.get_lock_for_this_transaction_and_var(t_obj.id, var)
                     if lock:
                         # lock is write lock. write to db and release lock
