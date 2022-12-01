@@ -79,3 +79,37 @@ t2: t1, t4, t5
 1) eait_q
 2) variable history
 3)
+
+
+begin(T2)
+begin(T1)
+R(T2, x2)
+W(T1, x2, 202)
+W(T2 x2, 302)
+
+
+R(T2, x) -- exec --- S(X, t2)
+
+W(T1, x, 202) --- waiting
+
+
+x: {T2: [T1]}
+
+
+W(T2, x2, 302) -- can_acquire : blocking_t = []
+
+x: {T2:[T1], T1:[T2]}
+
+
+
+faile(A, B)
+begin(T3)
+W(T3, x, 5)    c, d : x = 5
+recover(A,B)
+W(T3, x, 10)
+
+faile(A, B)
+begin(T3)
+W(T3, x, 5)    c, d : x = 5
+recover(A,B)
+R(T3, x, 10) c, d 

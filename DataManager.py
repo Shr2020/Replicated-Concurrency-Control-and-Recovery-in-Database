@@ -161,3 +161,8 @@ class DataManager:
 
     def add_to_disable_read(self, var):
         self.disable_read.add(var)
+
+    def has_snapshot_for_tid(self, transaction_id):
+        pass
+
+    
