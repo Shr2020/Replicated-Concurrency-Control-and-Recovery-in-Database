@@ -6,7 +6,7 @@ class DataManager:
         self.is_available = True
         self.lock_map = {} 
         self.site_id = id
-        self.buffer = {} #t_id:(var, val)
+        self.buffer = {} 
         self.backups = {} # t_id:(version_number,db)
         self.variables = set()
         self.initialize_site_vars_and_db(id)
@@ -43,18 +43,16 @@ class DataManager:
         if tid not in self.buffer.keys():
             self.buffer[tid] = {}
         self.buffer[tid][var] = val
-        # print("buffer values")
-        # print(tid)
-        # print(var)
-        # print(self.buffer[tid][var])
+        
+        
 
     def read_operation(self,tid,var):
         if tid in self.buffer.keys() and var in self.buffer[tid]:
-            print(self.buffer[tid][var])
-        print(self.db.get_value(var))
+            print(var," : ",self.buffer[tid][var])
+        print(var," : ",self.db.get_value(var))
     
     def read_only_operation(self, tid, var):
-        print(self.backups[tid][var])
+        print(var," : ",self.backups[tid][var])
 
     def snapshot_db(self, tid):
         self.backups[tid] = {};
@@ -122,8 +120,8 @@ class DataManager:
                 lock.lock_type='W'
 
     def update_database(self, tid, var):
-        for (var, val) in self.buffer[tid]:
-            self.db.update_key(var, val)
+        for var in self.buffer[tid]:
+            self.db.update_key(var,self.buffer[tid][var])
 
     def recover_site(self):
         self.is_available = True
@@ -167,6 +165,6 @@ class DataManager:
         self.disable_read.add(var)
 
     def has_snapshot_for_tid(self, transaction_id):
-        pass
+        return transaction_id in self.backups
 
     

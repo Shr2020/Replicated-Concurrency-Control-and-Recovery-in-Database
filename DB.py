@@ -27,4 +27,4 @@ class DB:
 
     def print_kv(self):
         for var, val in self.kv.items():
-            print(var, " : ",  val)
+            print(var, ": ",  val)
