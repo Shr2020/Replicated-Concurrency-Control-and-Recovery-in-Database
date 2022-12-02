@@ -43,6 +43,10 @@ class DataManager:
         if tid not in self.buffer.keys():
             self.buffer[tid] = {}
         self.buffer[tid][var] = val
+        # print("buffer values")
+        # print(tid)
+        # print(var)
+        # print(self.buffer[tid][var])
 
     def read_operation(self,tid,var):
         if tid in self.buffer.keys() and var in self.buffer[tid]:

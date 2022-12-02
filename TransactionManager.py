@@ -91,15 +91,16 @@ class TransactionManager:
                 # update waitqueue 
                 if len(blocking_transactions) > 0:
                     for t_id in blocking_transactions:
-                        if t_id in self.transaction_wait_queue[var]:
-                            self.transaction_wait_queue[var][t_id].append(transaction_id) 
+                        if t_id not in self.transaction_wait_queue[var]:
+                            self.transaction_wait_queue[var][t_id] = set()
+                        self.transaction_wait_queue[var][t_id].add(transaction_id)
                 else:
                     # no blocking transactions at any site. start write.
                     t_obj = self.current_transactions[transaction_id]
-
+                        
                     # add affected var to this transaction. Needed to release lock during commit
                     if var not in t_obj.var_affected:
-                        t_obj.var_affected.append(var)
+                        t_obj.var_affected.add(var)
                     
                     for site in site_to_be_affected:
                         site.acquire_write_lock(transaction_id, var)
@@ -112,7 +113,7 @@ class TransactionManager:
     
     ''' Method to handle read operation for a read write transaction.'''
     def read_operation(self, transaction_id, op):
-        if self.current_transactions[t_id].transaction_state != trst.TransactionStates.TO_BE_ABORTED:
+        if self.current_transactions[transaction_id].transaction_state != trst.TransactionStates.TO_BE_ABORTED:
             var = op.var
             site_to_read_from = []
             sites_var = []
@@ -205,6 +206,7 @@ class TransactionManager:
 
     '''Method to handle the end transaction'''
     def end_transaction(self, transaction_id):
+        
         t_obj = self.all_transactions[transaction_id]
         if (t_obj.transaction_state == trst.TransactionStates.TO_BE_ABORTED):
                 self.abort_transaction(transaction_id)
@@ -267,38 +269,42 @@ class TransactionManager:
             #undo all operations
             for op in t_obj.get_operations():
                 # undo all Writes. Reads can be ignored
-                if op.type == 'W':
-                    for site, site_obj in self.sites.items():
+                if op.op_type == 'W':
+                    for site_id in t_obj.sites_affected:
+                        site_obj = self.sites[site_id]
                         if site_obj.is_site_up() and site_obj.is_var_in_site(op.var):
                             #site buffer update.. remove t_id from the buffer and version from map
-                            site_obj.buffer.pop(transaction_id)
-                            site_obj.backups.pop(transaction_id)
-        self.aborted_transaction.append(transaction_id)
-        self.current_transactions.pop(transaction_id, None)
-        self.all_transactions[transaction_id].update_transaction_state(trst.TransactionStates.ABORTED)
+                            if transaction_id in site_obj.buffer:
+                                del site_obj.buffer[transaction_id]
+    
+            self.aborted_transaction.append(transaction_id)
+            self.current_transactions.pop(transaction_id, None)
+            self.all_transactions[transaction_id].update_transaction_state(trst.TransactionStates.ABORTED)
         # release all locks for this transaction
-        for var in t_obj.vars_affected:
-            for site_id in t_obj.sites_affected:
-                site = self.sites[site_id]
-                if site.is_var_in_site(var):
-                    lock = site.get_lock_for_this_transaction_and_var(t_obj.id, var)
-                    if lock:
+            for var in t_obj.var_affected:
+                for site_id in t_obj.sites_affected:
+                    site = self.sites[site_id]
+                    if site.is_var_in_site(var):
+                        lock = site.get_lock_for_this_transaction_and_var(t_obj.transaction_id, var)
+                        if lock:
                         # lock is write lock. write to db and release lock
-                        if lock.type == 'W':
-                            site.release_lock(t_obj.id, var, 'W')
+                            if lock.lock_type == 'W':
+                                site.release_lock(t_obj.transaction_id, var, 'W')
                         # lock is read lock. release lock
-                        if lock.type == 'R':
-                            site.release_lock(t_obj.id, var, 'R')
-        self.remove_transaction_from_waiting_queue(transaction_id)
-        self.resume_all_waiting_transactions(transaction_id)
+                            if lock.lock_type == 'R':
+                                site.release_lock(t_obj.transaction_id, var, 'R')
+            self.remove_transaction_from_waiting_queue(transaction_id)
+            self.resume_all_waiting_transactions(transaction_id)
     
     ''' Method to remove this transaction from all lists of waiting transactions'''
     def remove_transaction_from_waiting_queue(self, transaction_id):
         # remove this transaction from waiting queue of all transactions
         for var in self.transaction_wait_queue:
-            for t_list in self.transaction_wait_queue[var]:
-                if transaction_id in set(t_list):
-                    t_list.remove(transaction_id)
+            for curr_tid in self.transaction_wait_queue[var]:
+                if transaction_id in self.transaction_wait_queue[var][curr_tid]:
+                    self.transaction_wait_queue[var][curr_tid].remove(transaction_id)
+                    if len(self.transaction_wait_queue[var][curr_tid])==0:
+                        self.transaction_wait_queue[var] = {}
 
     ''' Method to cleanup the keys of wait_queue for each var'''
     def cleanup_waiting_queue(self, transaction_id):
@@ -322,24 +328,23 @@ class TransactionManager:
         transactions_list = set()
         for var in self.transaction_wait_queue:
             if transaction_id in self.transaction_wait_queue[var]:
-                transactions_list.add(self.transaction_wait_queue[var][transaction_id])
+                transactions_list.update(self.transaction_wait_queue[var][transaction_id])
         op_list = []
         self.cleanup_waiting_queue(transaction_id) # x:{t1:[t2, t3]} y:{t1:[t4, t5]}
-
         #check all ransactions waiting for sites to be availablle and add it to the op list
-        transactions_waiting_for_site = self.resume_all_site_waiting_transactions()
-        transactions_list.add(transactions_waiting_for_site)
+        #transactions_waiting_for_site = self.resume_all_site_waiting_transactions()
+        #transactions_list.add(transactions_waiting_for_site)
         for t_id in transactions_list:
             t_obj = self.all_transactions[t_id]
             #operation to resume on
             op = t_obj.get_op()
             op_list.append(op)
-        op_list.sort(key=lambda x: x.time)
+        op_list.sort(key=lambda x: x.start_time)
         for op in op_list:
-            if op.type == 'W':
-                self.write_operation(op.tid, op.var, op.val)
-            if op.type == 'R':
-                self.read_operation(op.tid, op.var)
+            if op.op_type == 'W':
+                self.write_operation(op.tid, op)
+            if op.op_type == 'R':
+                self.read_operation(op.tid, op)
 
     ''' Method to fail site'''
     def fail_site(self, site):
@@ -354,19 +359,34 @@ class TransactionManager:
     def recover_site(self, site):
         site_obj = self.sites[site]
         site_obj.recover_site(site)
+    ''' Method to detect a deadlock in wait graph'''
+    def deadlock_graph(self):
+        deadlock_graph = {}
+        
+        for var in self.transaction_wait_queue:
+            for tid in self.transaction_wait_queue[var]:
+                if  tid not in deadlock_graph:
+                    deadlock_graph[tid] = set()
+                deadlock_graph[tid].update(self.transaction_wait_queue[var][tid])
+        for tid in deadlock_graph:
+            visited = {}
+            rec_stack = []
+            self.deadlock_detect(tid, visited, rec_stack,deadlock_graph)
+
+
+
 
     ''' Method to detect a deadlock in wait graph'''
-    def deadlock_detect(self, tid, visited, rec_stack):
-        if tid in self.transaction_wait_queue:
+    def deadlock_detect(self, tid, visited, rec_stack,deadlock_graph):
+        if tid in deadlock_graph:
 
             visited[tid] = len(rec_stack) + 1
             rec_stack.append(tid)
-
-            for curr_tid in self.transaction_wait_queue[tid]:
+            for curr_tid in deadlock_graph[tid]:
                 if curr_tid in visited:
                     self.deadlock_clear(rec_stack, visited[curr_tid] - 1)
                 else:
-                    self.deadlock_detect(curr_tid, visited, rec_stack)
+                    self.deadlock_detect(curr_tid, visited, rec_stack,deadlock_graph)
 
             rec_stack.pop()
             visited.pop(tid)
@@ -375,12 +395,17 @@ class TransactionManager:
     def deadlock_clear(self, trans_list, index):
         transaction_id_list = trans_list[index:]
         youngest_id = -1
+        youngest_time = -1;
+
 
         for t_id in transaction_id_list:
-            if youngest_id < t_id:
+            if self.all_transactions[t_id].time > youngest_time:
                 youngest_id = t_id
+                youngest_time = self.all_transactions[t_id].time
+        print("aborting transaction")
+        print(youngest_id)
+        self.abort_transaction(youngest_id)
 
-        self.abort_transaction(t_id)
     
     ''' Method to create snapshots on sites when a Read ONly Transaction begins.'''
     def create_snapshots(self, t_id):
@@ -391,6 +416,8 @@ class TransactionManager:
     ''' Method to execute instructions coming from a input file'''
     def execute_transaction(self, transaction):
         self.tick()
+        self.deadlock_graph()
+
         op = transaction[0]
 
         if op == "begin":

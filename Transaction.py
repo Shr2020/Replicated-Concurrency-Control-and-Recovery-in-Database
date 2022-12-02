@@ -15,7 +15,7 @@ class Transaction:
         self.sites_affected = set()
         
         # all the variables affected (read/write)
-        self.var_affected = []
+        self.var_affected = set()
         
         # queue of all operations
         self.operations = []
@@ -47,7 +47,7 @@ class Transaction:
 
     # return the next operation and pops it from the queue
     def get_op(self):
-        return self.remaining_operations.pop(0)
+        return self.remaining_operations[0]
 
     # return the next operation by peeking in the queue
     def read_next_op(self):
