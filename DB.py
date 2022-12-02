@@ -6,21 +6,28 @@ class DB:
         # key-value store 
         self.kv = {}
     
+    # update value of key in key-value store 
     def update_key(self, key, val):
         self.kv[key] = val
 
+    # get value of key from key-value store 
     def get_value(self, key):
         if key in self.kv:
             return self.kv[key]
         return None
 
+    # check if key-value store has key
     def has_key(self, key):
         return key in self.kv
+    
+    # remove key from key-value store
     def remove_key(self,key):
         self.kv.pop(key,None)
 
+    # increment version of db 
     def increment_version(self):
         self.version+=1
 
+    # get version of db 
     def get_version(self):
         return self.version
