@@ -70,6 +70,8 @@ class TransactionManager:
             # no available sites
             if len(site_to_be_affected) == 0:
                 self.transaction_waiting_for_site[transaction_id] = sites_var
+                print("Transactions:",transaction_id," is waiting for sites for write operation")
+                return False
             else:
                 # check if there are any blocking transactions at any site. If yes then put the transaction in waitqueue, else write to each site.
                 blocking_transactions = set()
@@ -89,6 +91,7 @@ class TransactionManager:
                             self.transaction_wait_queue[var][t_id] = set()
                         self.transaction_wait_queue[var][t_id].add(transaction_id)
                         print("Transactions:",transaction_id," is waiting for:- ",blocking_transactions)
+                        return False
                 else:
                     # no blocking transactions at any site. start write.
                     t_obj = self.current_transactions[transaction_id]
@@ -105,6 +108,9 @@ class TransactionManager:
                             t_obj.sites_affected.add(site.site_id)
                     t_obj.remaining_operations.remove(op)
                     t_obj.update_transaction_state(trst.TransactionStates.RUNNING)
+                    return True
+        return False
+    
     
     ''' Method to handle read operation for a read write transaction.'''
     def read_operation(self, transaction_id, op):
@@ -122,7 +128,8 @@ class TransactionManager:
             # no available sites
             if len(site_to_read_from) == 0:
                 self.transaction_waiting_for_site[transaction_id] = sites_var
-                return
+                print("Transactions:",transaction_id," is waiting for sites for read operation")
+                return False
             else:
                 # check if there are blocking transactions at all sites. If yes then put the transaction in waitqueue, else read value
                 blocking_transactions = set()
@@ -153,7 +160,7 @@ class TransactionManager:
                             t_obj.update_transaction_state(trst.TransactionStates.RUNNING)
                             added_to_waiting = False
                             read_invoked = True
-                            break
+                            return True
                 if added_to_waiting:
                     for t in self.transaction_wait_queue[var]:
                     # list of tansactions waiting for t. our current transaction has to wait for the already waiting transactions to complete first.(first-come-first-serve)
@@ -169,6 +176,7 @@ class TransactionManager:
                         if t_id not in self.transaction_wait_queue[var]:
                             self.transaction_wait_queue[var][t_id] = set()
                         self.transaction_wait_queue[var][t_id].add(transaction_id) 
+        return False
 
     ''' Method to handle read operation for a read only transaction.'''
     def read_only_operation(self, transaction_id, op):
@@ -314,7 +322,7 @@ class TransactionManager:
         for t_id, sites in self.transaction_waiting_for_site.items():
             for site in sites:
                 if self.sites[site].is_site_up():
-                    transactions_list.add(self.transaction_wait_queue(t_id))
+                    transactions_list.add(t_id)
                     break
         return transactions_list
 
@@ -325,22 +333,27 @@ class TransactionManager:
         for var in self.transaction_wait_queue:
             if transaction_id in self.transaction_wait_queue[var]:
                 transactions_list.update(self.transaction_wait_queue[var][transaction_id])
+
         op_list = []
         self.cleanup_waiting_queue(transaction_id) # x:{t1:[t2, t3]} y:{t1:[t4, t5]}
         #check all ransactions waiting for sites to be availablle and add it to the op list
-        #transactions_waiting_for_site = self.resume_all_site_waiting_transactions()
-        #transactions_list.add(transactions_waiting_for_site)
+        transactions_waiting_for_site = self.resume_all_site_waiting_transactions()
+        transactions_list.update(transactions_waiting_for_site)
         for t_id in transactions_list:
-            t_obj = self.all_transactions[t_id]
-            #operation to resume on
+            t_obj = self.current_transactions[t_id]
             op = t_obj.get_op()
             op_list.append(op)
         op_list.sort(key=lambda x: x.start_time)
         for op in op_list:
+            res = False
             if op.op_type == 'W':
-                self.write_operation(op.tid, op)
+                res = self.write_operation(op.tid, op)
             if op.op_type == 'R':
-                self.read_operation(op.tid, op)
+                res = self.read_operation(op.tid, op)
+            if res and op.tid in transactions_waiting_for_site:
+                if op.op_type =='R':
+                    print("Transaction ",op.tid," performed read operation after waiting for site to up")
+                self.transaction_waiting_for_site.pop(op.tid)
 
     ''' Method to fail site'''
     def fail_site(self, site):
@@ -416,34 +429,34 @@ class TransactionManager:
         self.tick()
         self.deadlock_graph()
 
-        op = transaction[0]
+        op = transaction[0].strip()
 
         if op == "begin":
-            t_id = transaction[1]
+            t_id = transaction[1].strip()
             t_obj = tr.Transaction(t_id, self.time, "RW")
             self.begin_transaction(t_id, t_obj)
 
         elif op == "beginRO":
-            t_id = transaction[1]
+            t_id = transaction[1].strip()
             t_obj = tr.Transaction(t_id, self.time, "RO")
             self.begin_transaction(t_id, t_obj)
             self.create_snapshots(t_id)
 
         elif op == "end":
-            t_id = transaction[1]
+            t_id = transaction[1].strip()
             self.end_transaction(t_id)
 
         elif op == "W":
-            t_id = transaction[1]
-            var = transaction[2]
-            val = transaction[3]
+            t_id = transaction[1].strip()
+            var = transaction[2].strip()
+            val = transaction[3].strip()
             operation = opn.Operations('W', self.time, t_id, var, val)
             self.all_transactions[t_id].add_operation(operation)
             self.write_operation(t_id, operation)
 
         elif op == "R":
-            t_id = transaction[1]
-            var = transaction[2]
+            t_id = transaction[1].strip()
+            var = transaction[2].strip()
             operation = opn.Operations('R', self.time, t_id, var, None)
             t_obj = self.all_transactions[t_id]
             t_obj.add_operation(operation)
@@ -456,11 +469,11 @@ class TransactionManager:
             self.dump()
 
         elif op == "fail":
-            site = transaction[1]
+            site = transaction[1].strip()
             self.fail_site(int(site))
 
         elif op == "recover":
-            site = transaction[1]
+            site = transaction[1].strip()
             self.recover_site(int(site))
             
 
