@@ -91,11 +91,11 @@ class DataManager:
             return blocking_transactions
         for lock in self.lock_map[var]:
             if lock.t_id != tid and lock.lock_type == "W":
-                blocking_transactions.append(lock)
+                blocking_transactions.append(lock.t_id)
         return  blocking_transactions  
 
     def acquire_read_lock(self, tid, var):
-        lock = lk.Lock("R", tid, var)
+        lock = lk.Lock("R",var,tid)
         if var not in self.lock_map.keys():
             self.lock_map[var] = []
         for currlock in self.lock_map[var]:
@@ -148,7 +148,12 @@ class DataManager:
         return self.is_available
 
     def print_db(self):
-        self.db.print_kv()
+        for var in self.variables:
+            if self.db.has_key(var):
+                print(var, " ",self.db.get_value(var))
+            else:
+                i = int(var[1:])
+                print(var, " ",10*i)
 
     def get_locks(self):
         return self.lock_map

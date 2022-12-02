@@ -24,7 +24,3 @@ class DB:
 
     def get_version(self):
         return self.version
-
-    def print_kv(self):
-        for var, val in self.kv.items():
-            print(var, ": ",  val)

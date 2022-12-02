@@ -63,30 +63,24 @@ class TransactionManager:
             for site in self.sites.values():
                 if var in site.variables:
                     sites_var.append(site.site_id)
-                if site.is_site_up and var in site.variables:
+                if site.is_site_up() and var in site.variables:
                         site_to_be_affected.append(site)
+                        
             
             # no available sites
             if len(site_to_be_affected) == 0:
                 self.transaction_waiting_for_site[transaction_id] = sites_var
             else:
                 # check if there are any blocking transactions at any site. If yes then put the transaction in waitqueue, else write to each site.
-                blocking_transactions = []
+                blocking_transactions = set()
                 for site in site_to_be_affected:
-                    blocking_transactions_set = set(blocking_transactions)
                     blocking_t = site.can_acquire_write_lock(transaction_id, var)
-                    for bt in blocking_t:
-                        if bt not in blocking_transactions_set:
-                            blocking_transactions.append(bt)
-                
-                if blocking_transactions == [] and self.transaction_wait_queue[var] != {}:
+                    blocking_transactions.update(blocking_t)
+                if len(blocking_transactions) == 0 and self.transaction_wait_queue[var] != {}:
                     for t in self.transaction_wait_queue[var]:
                         # list of tansactions waiting for t. our current transaction has to wait for the already waiting transactions to complete first.(first-come-first-serve)
                         wt_list = self.transaction_wait_queue[var][t]
-                        blocking_transactions_set = set(blocking_transactions)
-                        for wt in wt_list:
-                            if wt not in blocking_transactions_set:
-                                blocking_transactions.append(wt)        
+                        blocking_transactions.update(wt_list)        
                 
                 # update waitqueue 
                 if len(blocking_transactions) > 0:
@@ -121,60 +115,60 @@ class TransactionManager:
             # find the sites that we can read from
             for site in self.sites.values():
                 if var in site.variables:
-                    sites_var.append(site.id)
+                    sites_var.append(site.site_id)
                 if var in site.variables and site.is_site_up and site.can_read_var(transaction_id, var):
                         site_to_read_from.append(site)
             
             # no available sites
             if len(site_to_read_from) == 0:
                 self.transaction_waiting_for_site[transaction_id] = sites_var
+                return
             else:
                 # check if there are blocking transactions at all sites. If yes then put the transaction in waitqueue, else read value
-                blocking_transactions = []
+                blocking_transactions = set()
                 read_invoked = False
                 added_to_waiting = False
                 for site in site_to_read_from:
                     blocking_t = site.can_acquire_read_lock(transaction_id, var)
-                    blocking_transactions_set = set(blocking_transactions)
-                    for bt in blocking_t:
-                        if bt not in blocking_transactions_set:
-                            blocking_transactions.append(bt)
-                    
-                    if not blocking_t:
+                    blocking_transactions.update(blocking_t)
+                    if len(blocking_t)==0:
                         # check if this transaction should wait for any other waiting transaction
                         if self.transaction_wait_queue[var] != {}:
-                            for t in self.transaction_wait_queue[var]:
-                                # list of tansactions waiting for t. our current transaction has to wait for the already waiting transactions to complete first.(first-come-first-serve)
-                                wt_list = self.transaction_wait_queue[var][t]
-                                blocking_transactions_set = set(blocking_transactions)
-                                #{x:{T1(W):[T2(W), T3(R)]}, curr T4(R, x).. then T4 should wait on T2 only
-                                for wt in wt_list:
-                                    if wt not in blocking_transactions_set:
-                                        if (self.all_transactions[wt].read_next_op().type() == 'W'):
-                                            blocking_transactions.append(wt)
+                            added_to_waiting = True
+                            
                         else:
                             # there is a site with no blocking transaction. Read from here
                             t_obj = self.current_transactions[transaction_id]
 
                             # add affected var to this transaction. Needed to release lock during commit
-                            if var not in t_obj.var_affected:
-                                t_obj.var_affected.append(var)
+                            
+                            t_obj.var_affected.add(var)
                             site.acquire_read_lock(transaction_id, var)
                             site.read_operation(transaction_id, var)
                             # add this site to site affected for this transaction. Needed to release lock during commit
-                            if site not in t_obj.site_affected:
-                                t_obj.site_affected.add(site)
+                            if site.site_id not in t_obj.sites_affected:
+                                t_obj.sites_affected.add(site.site_id)
 
                             t_obj.remaining_operations.remove(op)
                             t_obj.update_transaction_state(trst.TransactionStates.RUNNING)
+                            added_to_waiting = False
                             read_invoked = True
                             break
-                
+                if added_to_waiting:
+                    for t in self.transaction_wait_queue[var]:
+                    # list of tansactions waiting for t. our current transaction has to wait for the already waiting transactions to complete first.(first-come-first-serve)
+                        wt_list = self.transaction_wait_queue[var][t]
+                        #{x:{T1(W):[T2(W), T3(R)]}, curr T4(R, x).. then T4 should wait on T2 only
+                        for wt in wt_list:
+                            if (self.all_transactions[wt].read_next_op().type() == 'W'):
+                                blocking_transactions.add(wt)
                 # we were not able to read from any site. put transaction in wait queue.
-                if not added_to_waiting or not read_invoked:
+                if not read_invoked:
+                    print("Transactions:",transaction_id," is waiting for:- ",blocking_transactions)
                     for t_id in blocking_transactions:
-                        if t_id in self.transaction_wait_queue[var]:
-                            self.transaction_wait_queue[var][t_id].append(transaction_id) 
+                        if t_id not in self.transaction_wait_queue[var]:
+                            self.transaction_wait_queue[var][t_id] = set()
+                        self.transaction_wait_queue[var][t_id].add(transaction_id) 
 
     ''' Method to handle read operation for a read only transaction.'''
     def read_only_operation(self, transaction_id, op):
@@ -350,21 +344,21 @@ class TransactionManager:
 
     ''' Method to fail site'''
     def fail_site(self, site):
+        
         site_obj = self.sites[site]
-        site_obj.fail_site(site)
+        site_obj.fail_site()
         for t_id in self.current_transactions:
             t_obj = self.current_transactions[t_id]
             if site in t_obj.sites_affected:
-                t_obj.update_status(trst.TransactionStates.TO_BE_ABORTED)
+                t_obj.update_transaction_state(trst.TransactionStates.TO_BE_ABORTED)
 
     ''' Method to recover site'''
     def recover_site(self, site):
         site_obj = self.sites[site]
-        site_obj.recover_site(site)
+        site_obj.recover_site()
     ''' Method to detect a deadlock in wait graph'''
     def deadlock_graph(self):
         deadlock_graph = {}
-        
         for var in self.transaction_wait_queue:
             for tid in self.transaction_wait_queue[var]:
                 if  tid not in deadlock_graph:
@@ -463,11 +457,11 @@ class TransactionManager:
 
         elif op == "fail":
             site = transaction[1]
-            self.fail_site(site)
+            self.fail_site(int(site))
 
         elif op == "recover":
             site = transaction[1]
-            self.recover_site(site)
+            self.recover_site(int(site))
             
 
 
