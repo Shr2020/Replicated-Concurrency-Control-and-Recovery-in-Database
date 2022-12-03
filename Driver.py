@@ -6,13 +6,10 @@ import os
 fname = ""
 
 parser = argparse.ArgumentParser()
-parser.add_argument("filename", help="specify the input file to be read or the directory having multiple files")
+parser.add_argument("fdname", help="specify the input file to be read or the directory having multiple files")
 args = parser.parse_args()
 
-fname = args.filename
-
-tm = t.TransactionManager()
-
+fname = args.fdname
 
 def check_file_or_dir(fdname):
     if os.path.exists(fdname) and os.path.isdir(fdname):
@@ -44,6 +41,7 @@ def start(fdname):
 
 def read_file(file):
     f = open(file, 'r')
+    tm = t.TransactionManager()
     for x in f:
         x = x.replace(")", "").strip()
         s = re.split('\(|\)|,', x)
