@@ -460,7 +460,7 @@ class TransactionManager:
             t_id = transaction[1].strip()
             var = transaction[2].strip()
             val = transaction[3].strip()
-            operation = opn.Operation(opn.OP_Type.WRITE, self.time, t_id, var, val)
+            operation = opn.Operation(opn.OP_Type.WRITE, self.time, t_id, var, int(val))
             self.all_transactions[t_id].add_operation(operation)
             self.write_operation(t_id, operation)
 
