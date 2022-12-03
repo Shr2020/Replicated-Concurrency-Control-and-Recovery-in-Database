@@ -277,7 +277,7 @@ class TransactionManager:
                     if lock.lock_type == lk.Lock_Type.READ_LOCK:
                         site.release_lock(transaction.get_tid(), var, lk.Lock_Type.READ_LOCK)
             if is_write_op:
-                print("WRITE OPERATION COMMITED for variable", var, "with val", val, "on sites:", sites_affected)
+                print("WRITE OPERATION COMMITED for Transaction", transaction.get_tid(), "for variable", var, "with val", val, "on sites:", sites_affected)
         
         # update transaction status to commited
         transaction.update_transaction_state(tr.TransactionStates.COMMITED)
