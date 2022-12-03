@@ -202,7 +202,7 @@ class TransactionManager:
         
 
     def dump(self):
-        print("\nPrinting values of variables at all Sites.\n")
+        print("\nDUMP: Printing values of variables at all Sites.\n")
         for site in range(1, 11):
             print("SITE:", site)
             site_obj = self.sites[site]

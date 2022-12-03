@@ -198,7 +198,7 @@ class DataManager:
             else:
                 i = int(var[1:])
                 result.append((var, 10*i))
-        print("DB (Variable, Value):", result)
+        print("DB [(Variable, Value)]:", result)
 
     ''' return the lock held by this transaction on this var. If no lock is there, return None'''
     def get_lock_for_this_transaction_and_var(self, t_id, var):
