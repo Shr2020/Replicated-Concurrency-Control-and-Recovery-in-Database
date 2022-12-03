@@ -71,17 +71,18 @@ class DataManager:
         if tid not in self.buffer.keys():
             self.buffer[tid] = {}
         self.buffer[tid][var] = val
+        #print("WRITE OPERATION on buffer (uncommited) by", tid, "on", var, "with val", val, "on site", self.site_id)
     
     '''Read the value of the var corresponding read operation of this transaction from the the buffer if 
     there are uncommitted changes from this transaction, otherwise read from db'''
     def read_operation(self,tid,var):
         if tid in self.buffer.keys() and var in self.buffer[tid]:
-            print(var," : ",self.buffer[tid][var])
-        print(var," : ",self.db.get_value(var))
+            print("READ OPERATION by", tid, "on", var, ":",self.buffer[tid][var])
+        print("READ OPERATION by", tid, "on", var, ":", self.db.get_value(var))
     
     ''' Read the value of the var at the begin tome of thid Read-only Transaction'''
     def read_only_operation(self, tid, var):
-        print(var," : ",self.backups[tid][var])
+        print("READ_ONLY OPERATION by", tid, "on", var, ":", self.backups[tid][var])
 
     ''' Take a snapshot of DB at this site for ReadOnly transaction(tid) and save it to backup map'''
     def snapshot_db(self, tid):
@@ -158,7 +159,9 @@ class DataManager:
     ''' Commit changes to the var of this transaction by writing it to DB from buffer.'''
     def update_database(self, tid, var, commit_time):
         for var in self.buffer[tid]:
-            self.db.update_key(var,self.buffer[tid][var],commit_time)
+            self.db.update_key(var, self.buffer[tid][var], commit_time)
+            # print("Transaction", tid, "COMMITED for VAR:", var, "with VAL",  self.buffer[tid][var], "on SITE", self.site_id, "at TIME", commit_time)
+        return self.buffer[tid][var]
 
     ''' Make the site available'''
     def recover_site(self):
@@ -187,12 +190,14 @@ class DataManager:
 
     ''' print all the latest commited values to the db'''
     def print_db(self):
+        result = []
         for var in self.variables:
             if self.db.has_key(var):
-                print(var, " ",self.db.get_value(var))
+                result.append((var, self.db.get_value(var)))
             else:
                 i = int(var[1:])
-                print(var, " ",10*i)
+                result.append((var, 10*i))
+        print("DB (Variable, Value):", result)
 
     ''' return the lock held by this transaction on this var. If no lock is there, return None'''
     def get_lock_for_this_transaction_and_var(self, t_id, var):

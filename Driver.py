@@ -17,7 +17,7 @@ def start(file):
     for x in f:
         x = x.replace(")", "").strip()
         s = re.split('\(|\)|,', x)
-        print(s)
+        #print(s)
         tm.execute_transaction(s)
     f.close()
 
