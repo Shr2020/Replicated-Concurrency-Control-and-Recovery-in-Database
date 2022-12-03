@@ -261,23 +261,25 @@ class TransactionManager:
     def commit_transaction_and_release_locks(self, transaction):
         for var in transaction.get_affected_vars_of_transaction():
             is_write_op = False
-            val = 0
-            sites_affected = transaction.get_affected_sites_of_transaction()
-            for site_id in sites_affected:
+            v = 0
+            sa = []
+            for site_id in transaction.get_affected_sites_of_transaction():
                 site = self.sites[site_id]
                 lock = site.get_lock_for_this_transaction_and_var(transaction.get_tid(), var)
                 if lock:
                     # lock is write lock. write to db and release lock
                     if lock.lock_type == lk.Lock_Type.WRITE_LOCK:
                         is_write_op = True
-                        val = site.update_database(transaction.get_tid(), var, self.time)
+                        sa.append(site_id)
+                        v = site.update_database(transaction.get_tid(), var, self.time)
                         site.release_lock(transaction.get_tid(), var, lk.Lock_Type.WRITE_LOCK)
                     
                     # lock is read lock. release lock
                     if lock.lock_type == lk.Lock_Type.READ_LOCK:
                         site.release_lock(transaction.get_tid(), var, lk.Lock_Type.READ_LOCK)
             if is_write_op:
-                print("WRITE OPERATION COMMITED for Transaction", transaction.get_tid(), "for variable", var, "with val", val, "on sites:", sites_affected)
+                print("WRITE OPERATION COMMITED for Transaction", transaction.get_tid(), "for variable", var, "with val", v, "on sites:", sa)
+
         
         # update transaction status to commited
         transaction.update_transaction_state(tr.TransactionStates.COMMITED)

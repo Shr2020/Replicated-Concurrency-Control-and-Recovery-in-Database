@@ -158,10 +158,11 @@ class DataManager:
 
     ''' Commit changes to the var of this transaction by writing it to DB from buffer.'''
     def update_database(self, tid, var, commit_time):
-        for var in self.buffer[tid]:
+        if var in self.buffer[tid]:
             self.db.update_key(var, self.buffer[tid][var], commit_time)
             # print("Transaction", tid, "COMMITED for VAR:", var, "with VAL",  self.buffer[tid][var], "on SITE", self.site_id, "at TIME", commit_time)
-        return self.buffer[tid][var]
+            return self.buffer[tid][var]
+        return None
 
     ''' Make the site available'''
     def recover_site(self):
