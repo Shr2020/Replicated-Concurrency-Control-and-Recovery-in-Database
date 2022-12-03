@@ -11,7 +11,6 @@ args = parser.parse_args()
 
 fname = args.filename
 
-tm = t.TransactionManager()
 
 
 def check_file_or_dir(fdname):
@@ -44,6 +43,7 @@ def start(fdname):
 
 def read_file(file):
     f = open(file, 'r')
+    tm = t.TransactionManager()
     for x in f:
         x = x.replace(")", "").strip()
         s = re.split('\(|\)|,', x)

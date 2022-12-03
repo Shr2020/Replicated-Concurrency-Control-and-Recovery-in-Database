@@ -117,6 +117,8 @@ class TransactionManager:
                     t_obj.remove_op(op)
                     t_obj.update_transaction_state(tr.TransactionStates.RUNNING)
                     return True
+        else:
+            print("Transaction:",transaction_id," will be aborted at commit time due to site failure.So write connot be performed ")
         return False
     
     
@@ -184,6 +186,8 @@ class TransactionManager:
                         if t_id not in self.transaction_wait_queue[var]:
                             self.transaction_wait_queue[var][t_id] = set()
                         self.transaction_wait_queue[var][t_id].add(transaction_id) 
+        else:
+            print("Transaction:",transaction_id," will be aborted at commit time due to site failure.So read connot be performed ")
         return False
 
     ''' Method to handle read operation for a read only transaction.'''
@@ -320,7 +324,6 @@ class TransactionManager:
             # cleanup waiting queue and resume transactions
             self.remove_transaction_from_waiting_queue(transaction_id)
             self.resume_all_waiting_transactions(transaction_id)
-            print("Transaction ABORTED at commit time : ",transaction_id)
 
     ''' Method to remove this transaction from all lists of waiting transactions'''
     def remove_transaction_from_waiting_queue(self, transaction_id):
