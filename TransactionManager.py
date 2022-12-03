@@ -51,7 +51,7 @@ class TransactionManager:
         for var in self.vars:
             self.transaction_wait_queue[var] = {}
 
-    ''' Method to maintain time.'''
+    ''' Method to maintain time. Increments time every time the method is called.'''
     def tick(self):
         self.time+=1
 
