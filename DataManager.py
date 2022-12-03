@@ -156,7 +156,7 @@ class DataManager:
                 lock.set_lock_type(lk.Lock_Type.WRITE_LOCK)
 
     ''' Commit changes to the var of this transaction by writing it to DB from buffer.'''
-    def update_database(self, tid, var,commit_time):
+    def update_database(self, tid, var, commit_time):
         for var in self.buffer[tid]:
             self.db.update_key(var,self.buffer[tid][var],commit_time)
 

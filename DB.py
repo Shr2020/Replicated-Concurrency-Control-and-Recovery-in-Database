@@ -4,12 +4,12 @@ class DB:
         # version of the DB.
         self.version = 1
 
-        # key-value store 
+        # key-value store . Map with var as key and List of Value Objects as value {String: [Value]}
         self.kv = {}
     
     # update value of key in key-value store 
-    def update_key(self, key, val,commit_time):
-        value = vl.Value(val,commit_time)
+    def update_key(self, key, val, commit_time):
+        value = vl.Value(val, commit_time)
         if key not in self.kv.keys():
             self.kv[key] = []
         self.kv[key].append(value)

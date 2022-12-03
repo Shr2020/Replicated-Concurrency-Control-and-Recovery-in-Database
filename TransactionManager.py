@@ -5,12 +5,22 @@ import Lock as lk
 
 class TransactionManager:
     def __init__(self):
+        # time as integer
         self.time = 0
+
+        # Map of site_id to DataManager Object
         self.sites = {}
+
+        # List of all variables
         self.vars = []
+
+        # Map of ongoing transaction id to its transaction objec
         self.current_transactions = {}
 
-        # map of transaction to list of all transactions waiting on it. {var:{t:[list of t' waiting on t]}}
+        # Map of all transaction id to their transaction object
+        self.all_transactions = {}
+
+        # Map of a variable to map of transaction_id to list of transactions waiting on it.  {var:{t:[list of t' waiting on t]}}
         self.transaction_wait_queue ={}
         
         # map of transactions to sites which could start because all sites are down
@@ -18,9 +28,6 @@ class TransactionManager:
 
         # list of all aborted transactions
         self.aborted_transaction  = []
-
-        # list of all transactions
-        self.all_transactions = {}
 
         # list of ended transactions
         self.end_transacion_list = []
@@ -149,7 +156,6 @@ class TransactionManager:
                             t_obj = self.current_transactions[transaction_id]
 
                             # add affected var to this transaction. Needed to release lock during commit
-                            
                             t_obj.add_affected_var_to_transaction(var)
                             site.acquire_read_lock(transaction_id, var)
                             site.read_operation(transaction_id, var)
@@ -222,7 +228,7 @@ class TransactionManager:
                 print("END READONLY Transaction: ", transaction_id)
                 print()
                 t_obj.update_transaction_state(tr.TransactionStates.COMMITED)
-            
+                self.end_transacion_list.append(transaction_id)
             # Read-write  transaction
             if t_obj.get_type() == tr.TransactionType.READ_WRITE:
 
@@ -232,6 +238,7 @@ class TransactionManager:
                     # read writefinal values to all site db.
                     # release locks held by transaction_id
                     self.commit_transaction_and_release_locks(t_obj)
+                    self.end_transacion_list.append(transaction_id)
                     print(" Transaction committed: ",transaction_id)
                     print()
                 else:
@@ -323,7 +330,7 @@ class TransactionManager:
         for var in self.transaction_wait_queue:
             self.transaction_wait_queue[var].pop(transaction_id, None)
 
-
+    '''Method to handle resuming the transactions that are waiting for the sites to be recovered.'''
     def resume_all_site_waiting_transactions(self):
         transactions_list = set()
         for t_id, sites in self.transaction_waiting_for_site.items():
@@ -333,7 +340,7 @@ class TransactionManager:
                     break
         return transactions_list
 
-    ''' Method to handle resuming all transactions that were waitinng on transaction:transaction_id'''
+    ''' Method to handle resuming all transactions that were waiting on this transaction'''
     def resume_all_waiting_transactions(self, transaction_id):
         # transactions waiting on transaction:transaction_id
         transactions_list = set()
@@ -342,7 +349,7 @@ class TransactionManager:
                 transactions_list.update(self.transaction_wait_queue[var][transaction_id])
 
         op_list = []
-        self.cleanup_waiting_queue(transaction_id) # x:{t1:[t2, t3]} y:{t1:[t4, t5]}
+        self.cleanup_waiting_queue(transaction_id) 
         #check all ransactions waiting for sites to be availablle and add it to the op list
         transactions_waiting_for_site = self.resume_all_site_waiting_transactions()
         transactions_list.update(transactions_waiting_for_site)
@@ -377,7 +384,7 @@ class TransactionManager:
         site_obj = self.sites[site]
         site_obj.recover_site()
     
-    ''' Method to detect a deadlock in wait graph'''
+    ''' Method to create the graph from the transaction_wait_queue map '''
     def deadlock_graph(self):
         deadlock_graph = {}
         for var in self.transaction_wait_queue:
@@ -393,7 +400,7 @@ class TransactionManager:
                 self.deadlock_detect(tid, visited, rec_stack,deadlock_graph,total_visited)
 
     ''' Method to detect a deadlock in wait graph'''
-    def deadlock_detect(self, tid, visited, rec_stack,deadlock_graph,total_visited):
+    def deadlock_detect(self, tid, visited, rec_stack, deadlock_graph, total_visited):
         if tid in deadlock_graph and self.all_transactions[tid].transaction_state != tr.TransactionStates.ABORTED :
             total_visited.add(tid)
             visited[tid] = len(rec_stack) + 1
@@ -412,8 +419,6 @@ class TransactionManager:
         transaction_id_list = trans_list[index:]
         youngest_id = -1
         youngest_time = -1;
-
-
         for t_id in transaction_id_list:
             if self.all_transactions[t_id].time > youngest_time:
                 youngest_id = t_id
