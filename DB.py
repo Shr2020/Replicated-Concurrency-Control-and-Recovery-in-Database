@@ -1,3 +1,4 @@
+import Value as vl
 class DB:
     def __init__(self):
         # version of the DB.
@@ -7,13 +8,17 @@ class DB:
         self.kv = {}
     
     # update value of key in key-value store 
-    def update_key(self, key, val):
-        self.kv[key] = val
+    def update_key(self, key, val,commit_time):
+        value = vl.Value(val,commit_time)
+        if key not in self.kv.keys():
+            self.kv[key] = []
+        self.kv[key].append(value)
 
     # get value of key from key-value store 
     def get_value(self, key):
         if key in self.kv:
-            return self.kv[key]
+            index = len(self.kv[key])-1
+            return self.kv[key][index].getVal();
         return None
 
     # check if key-value store has key

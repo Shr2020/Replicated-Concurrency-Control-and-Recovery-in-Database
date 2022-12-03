@@ -34,12 +34,12 @@ class DataManager:
             if (i % 2 == 0):
                 var = "x" + str(i)
                 listt.append(var)
-                self.db.update_key(var, 10*i)
+                self.db.update_key(var, 10*i,0)
             else:
                 if (id == 1 + (i % 10)):
                     var = "x" + str(i)
                     listt.append(var)
-                    self.db.update_key(var, 10*i)
+                    self.db.update_key(var, 10*i,0)
         self.variables = set(listt)
 
     '''Returns the lock map of site'''
@@ -156,9 +156,9 @@ class DataManager:
                 lock.set_lock_type(lk.Lock_Type.WRITE_LOCK)
 
     ''' Commit changes to the var of this transaction by writing it to DB from buffer.'''
-    def update_database(self, tid, var):
+    def update_database(self, tid, var,commit_time):
         for var in self.buffer[tid]:
-            self.db.update_key(var,self.buffer[tid][var])
+            self.db.update_key(var,self.buffer[tid][var],commit_time)
 
     ''' Make the site available'''
     def recover_site(self):

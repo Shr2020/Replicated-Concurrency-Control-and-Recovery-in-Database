@@ -82,6 +82,5 @@ class Transaction:
         return self.remaining_operations[0]
 
     # remove operation from the remaining operation queue
-    def remove_op(op, self):
+    def remove_op(self,op):
         return self.remaining_operations.remove(op)
-

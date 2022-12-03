@@ -100,7 +100,6 @@ class TransactionManager:
                         
                     # add affected var to this transaction. Needed to release lock during commit
                     t_obj.add_affected_var_to_transaction(var)
-                    
                     for site in site_to_be_affected:
                         site.acquire_write_lock(transaction_id, var)
                         site.write_operation(transaction_id, var, val)
@@ -261,7 +260,7 @@ class TransactionManager:
                     # lock is write lock. write to db and release lock
                     if lock.lock_type == lk.Lock_Type.WRITE_LOCK:
                         print("site affected for write on variable ",var," : ",site_id)
-                        site.update_database(transaction.get_tid(), var)
+                        site.update_database(transaction.get_tid(), var,self.time)
                         site.release_lock(transaction.get_tid(), var, lk.Lock_Type.WRITE_LOCK)
                     
                     # lock is read lock. release lock
