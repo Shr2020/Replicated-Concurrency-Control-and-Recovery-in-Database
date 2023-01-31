@@ -1,3 +1,5 @@
+Project for the Advanced Database Course (NYU)
+
 # Replicated Concurrency Control and Recovery
 
 **Goal**: Implement a distributed database, with multi-version concurrency control, deadlock detection, replication, and failure recovery. 
